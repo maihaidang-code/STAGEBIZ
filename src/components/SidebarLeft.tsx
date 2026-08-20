@@ -1,17 +1,19 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Home, 
   UserCheck, 
   User, 
   Compass, 
-  Database, 
+  Bell, 
   PlusCircle,
-  LogIn
+  LogIn,
+  MessageSquare
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { api } from "../services/api";
 import { VerifiedBadge } from "./VerifiedBadge";
 
-export type NavTab = "for-you" | "following" | "explore" | "profile" | "docs";
+export type NavTab = "for-you" | "following" | "explore" | "chat" | "notifications" | "profile";
 
 interface SidebarLeftProps {
   currentTab: NavTab;
@@ -27,12 +29,43 @@ export const SidebarLeft: React.FC<SidebarLeftProps> = ({
   onSelectUser,
 }) => {
   const { user, isAuthenticated, openAuthModal } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const checkUnread = () => {
+      api.getNotifications({ unreadOnly: true })
+        .then((res) => setUnreadCount(res.unreadCount))
+        .catch(() => {});
+    };
+
+    checkUnread();
+    const interval = setInterval(checkUnread, 12000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, currentTab]);
 
   const navItems = [
     {
       id: "for-you" as NavTab,
       label: "Bảng tin chung",
       icon: Home,
+    },
+    {
+      id: "chat" as NavTab,
+      label: "Box Chat & Nhóm",
+      icon: MessageSquare,
+      badge: "Mới",
+    },
+    {
+      id: "notifications" as NavTab,
+      label: "Thông báo",
+      icon: Bell,
+      requiresAuth: true,
+      count: unreadCount,
     },
     {
       id: "following" as NavTab,
@@ -44,11 +77,6 @@ export const SidebarLeft: React.FC<SidebarLeftProps> = ({
       id: "explore" as NavTab,
       label: "Khám phá",
       icon: Compass,
-    },
-    {
-      id: "docs" as NavTab,
-      label: "Kiến trúc DB & API",
-      icon: Database,
     },
   ];
 
@@ -78,8 +106,27 @@ export const SidebarLeft: React.FC<SidebarLeftProps> = ({
                     : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60"
                 }`}
               >
-                <Icon className={`w-5 h-5 shrink-0 ${isActive ? "text-white" : "text-slate-500 dark:text-slate-400"}`} />
-                <span>{item.label}</span>
+                <div className="relative shrink-0">
+                  <Icon className={`w-5 h-5 ${isActive ? "text-white" : "text-slate-500 dark:text-slate-400"}`} />
+                  {Boolean(item.count && item.count > 0 && !isActive) && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-800"></span>
+                  )}
+                </div>
+                <span className="flex-1 text-left">{item.label}</span>
+                {Boolean(item.count && item.count > 0) && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    isActive ? "bg-white text-indigo-700 font-extrabold" : "bg-rose-500 text-white"
+                  }`}>
+                    {item.count! > 99 ? "99+" : item.count}
+                  </span>
+                )}
+                {item.badge && !item.count && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                    isActive ? "bg-white/20 text-white" : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                  }`}>
+                    {item.badge}
+                  </span>
+                )}
               </button>
             );
           })}

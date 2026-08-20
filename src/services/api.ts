@@ -1,4 +1,17 @@
-import { AuthResponse, Post, User, Comment, ReactionType, ReactionSummary } from "../types";
+import {
+  AuthResponse,
+  Post,
+  User,
+  Comment,
+  ReactionType,
+  ReactionSummary,
+  PostReactionUser,
+  ChatRoom,
+  ChatMessage,
+  Notification,
+  VerificationRequest,
+  PostVisibility,
+} from "../types";
 
 const TOKEN_KEY = "mini_social_jwt_token";
 
@@ -130,7 +143,7 @@ export const api = {
   },
 
   // Posts
-  async getPosts(params?: { tab?: "for-you" | "following"; userId?: string; search?: string }): Promise<Post[]> {
+  async getPosts(params?: { tab?: "for-you" | "following" | "friends" | "explore"; userId?: string; search?: string }): Promise<Post[]> {
     const query = new URLSearchParams();
     if (params?.tab) query.append("tab", params.tab);
     if (params?.userId) query.append("userId", params.userId);
@@ -149,20 +162,32 @@ export const api = {
     return handleResponse<Post>(res);
   },
 
-  async createPost(content: string, image?: string): Promise<Post> {
+  async createPost(content: string, imageOrImages?: string | string[], visibility?: PostVisibility): Promise<Post> {
+    const images = Array.isArray(imageOrImages) ? imageOrImages : imageOrImages ? [imageOrImages] : [];
     const res = await fetch("/api/posts", {
       method: "POST",
       headers: getHeaders(),
-      body: JSON.stringify({ content, image }),
+      body: JSON.stringify({ 
+        content, 
+        image: images[0] || undefined, 
+        images: images.length > 0 ? images : undefined,
+        visibility 
+      }),
     });
     return handleResponse<Post>(res);
   },
 
-  async updatePost(id: string, content: string, image?: string): Promise<Post> {
+  async updatePost(id: string, content: string, imageOrImages?: string | string[], visibility?: PostVisibility): Promise<Post> {
+    const images = Array.isArray(imageOrImages) ? imageOrImages : imageOrImages ? [imageOrImages] : [];
     const res = await fetch(`/api/posts/${id}`, {
       method: "PUT",
       headers: getHeaders(),
-      body: JSON.stringify({ content, image }),
+      body: JSON.stringify({ 
+        content, 
+        image: images[0] || undefined, 
+        images: images,
+        visibility 
+      }),
     });
     return handleResponse<Post>(res);
   },
@@ -200,6 +225,22 @@ export const api = {
     return handleResponse<{ sharesCount: number }>(res);
   },
 
+  async sharePostToProfile(postId: string, content?: string, visibility?: PostVisibility): Promise<{ newPost: Post; sharesCount: number }> {
+    const res = await fetch(`/api/posts/${postId}/share`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ shareToProfile: true, content, visibility }),
+    });
+    return handleResponse<{ newPost: Post; sharesCount: number }>(res);
+  },
+
+  async getPostReactions(postId: string): Promise<{ users: PostReactionUser[]; reactionsSummary: ReactionSummary; total: number }> {
+    const res = await fetch(`/api/posts/${postId}/reactions`, {
+      headers: getHeaders(false),
+    });
+    return handleResponse<{ users: PostReactionUser[]; reactionsSummary: ReactionSummary; total: number }>(res);
+  },
+
   // Comments
   async getComments(postId: string): Promise<Comment[]> {
     const res = await fetch(`/api/posts/${postId}/comments`, {
@@ -232,5 +273,256 @@ export const api = {
       headers: getHeaders(false),
     });
     await handleResponse<{ success: boolean }>(res);
+  },
+
+  // ==========================================
+  // CHAT ROOMS & APPROVAL SYSTEM
+  // ==========================================
+  async getChatRooms(): Promise<ChatRoom[]> {
+    const res = await fetch("/api/chat/rooms", {
+      headers: getHeaders(false),
+    });
+    return handleResponse<ChatRoom[]>(res);
+  },
+
+  async getChatRoom(id: string): Promise<ChatRoom> {
+    const res = await fetch(`/api/chat/rooms/${id}`, {
+      headers: getHeaders(false),
+    });
+    return handleResponse<ChatRoom>(res);
+  },
+
+  async createChatRoom(data: {
+    name: string;
+    description?: string;
+    roomCode?: string;
+    isRequireApproval?: boolean;
+    avatar?: string;
+  }): Promise<{ message: string; data: ChatRoom }> {
+    const res = await fetch("/api/chat/rooms", {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<{ message: string; data: ChatRoom }>(res);
+  },
+
+  async joinRoomByCode(code: string, message?: string): Promise<{ status: string; message: string; data: ChatRoom }> {
+    const res = await fetch("/api/chat/rooms/join-by-code", {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ code, message }),
+    });
+    return handleResponse<{ status: string; message: string; data: ChatRoom }>(res);
+  },
+
+  async approveJoinRequest(roomId: string, userId: string): Promise<{ message: string; data: ChatRoom }> {
+    const res = await fetch(`/api/chat/rooms/${roomId}/requests/${userId}/approve`, {
+      method: "POST",
+      headers: getHeaders(),
+    });
+    return handleResponse<{ message: string; data: ChatRoom }>(res);
+  },
+
+  async rejectJoinRequest(roomId: string, userId: string): Promise<{ message: string; data: ChatRoom }> {
+    const res = await fetch(`/api/chat/rooms/${roomId}/requests/${userId}/reject`, {
+      method: "POST",
+      headers: getHeaders(),
+    });
+    return handleResponse<{ message: string; data: ChatRoom }>(res);
+  },
+
+  async removeRoomMember(roomId: string, userId: string): Promise<{ message: string; data: ChatRoom }> {
+    const res = await fetch(`/api/chat/rooms/${roomId}/members/${userId}/remove`, {
+      method: "POST",
+      headers: getHeaders(),
+    });
+    return handleResponse<{ message: string; data: ChatRoom }>(res);
+  },
+
+  async deleteChatRoom(roomId: string): Promise<{ message: string }> {
+    const res = await fetch(`/api/chat/rooms/${roomId}`, {
+      method: "DELETE",
+      headers: getHeaders(false),
+    });
+    return handleResponse<{ message: string }>(res);
+  },
+
+  async getChatMessages(roomId: string): Promise<ChatMessage[]> {
+    const res = await fetch(`/api/chat/rooms/${roomId}/messages`, {
+      headers: getHeaders(false),
+    });
+    return handleResponse<ChatMessage[]>(res);
+  },
+
+  async sendChatMessage(roomId: string, content: string, image?: string): Promise<ChatMessage> {
+    const res = await fetch(`/api/chat/rooms/${roomId}/messages`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ content, image }),
+    });
+    return handleResponse<ChatMessage>(res);
+  },
+
+  async reactToChatMessage(
+    roomId: string,
+    messageId: string,
+    type: ReactionType
+  ): Promise<{ userReaction: ReactionType | null; reactionsSummary: ReactionSummary; reactions: { userId: string; type: ReactionType }[] }> {
+    const res = await fetch(`/api/chat/rooms/${roomId}/messages/${messageId}/react`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ type }),
+    });
+    return handleResponse<{ userReaction: ReactionType | null; reactionsSummary: ReactionSummary; reactions: { userId: string; type: ReactionType }[] }>(res);
+  },
+
+  // ==========================================
+  // ACCOUNT SETTINGS (PASSWORD & DELETION)
+  // ==========================================
+  async changePassword(data: { currentPassword: string; newPassword: string; confirmPassword?: string }): Promise<{ message: string }> {
+    const res = await fetch("/api/users/change-password", {
+      method: "PUT",
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || "Đổi mật khẩu thất bại");
+    }
+    return json;
+  },
+
+  async deleteAccount(password: string): Promise<{ message: string }> {
+    const res = await fetch("/api/users/account", {
+      method: "DELETE",
+      headers: getHeaders(),
+      body: JSON.stringify({ password }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || "Xóa tài khoản thất bại");
+    }
+    return json;
+  },
+
+  // ==========================================
+  // VERIFICATION (TICK XANH) REQUESTS & ADMIN
+  // ==========================================
+  async submitVerificationRequest(data: { category: string; reason: string; evidenceUrl?: string }): Promise<VerificationRequest> {
+    const res = await fetch("/api/verification/request", {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<VerificationRequest>(res);
+  },
+
+  async getMyVerificationRequest(): Promise<VerificationRequest | null> {
+    const res = await fetch("/api/verification/my-request", {
+      headers: getHeaders(false),
+    });
+    return handleResponse<VerificationRequest | null>(res);
+  },
+
+  async cancelVerificationRequest(): Promise<{ message: string }> {
+    const res = await fetch("/api/verification/my-request", {
+      method: "DELETE",
+      headers: getHeaders(false),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || "Không thể hủy yêu cầu");
+    }
+    return json;
+  },
+
+  async getAdminVerificationRequests(status?: string): Promise<VerificationRequest[]> {
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    const res = await fetch(`/api/admin/verification-requests${query}`, {
+      headers: getHeaders(false),
+    });
+    return handleResponse<VerificationRequest[]>(res);
+  },
+
+  async approveVerificationRequest(requestId: string, adminNotes?: string): Promise<{ request: VerificationRequest; user: User }> {
+    const res = await fetch(`/api/admin/verification-requests/${requestId}/approve`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ adminNotes }),
+    });
+    return handleResponse<{ request: VerificationRequest; user: User }>(res);
+  },
+
+  async rejectVerificationRequest(requestId: string, adminNotes?: string): Promise<VerificationRequest> {
+    const res = await fetch(`/api/admin/verification-requests/${requestId}/reject`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ adminNotes }),
+    });
+    return handleResponse<VerificationRequest>(res);
+  },
+
+  async revokeUserVerification(userId: string, reason?: string): Promise<User> {
+    const res = await fetch(`/api/admin/users/${userId}/revoke-verification`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ reason }),
+    });
+    return handleResponse<User>(res);
+  },
+
+  async grantUserVerification(userId: string): Promise<User> {
+    const res = await fetch(`/api/admin/users/${userId}/grant-verification`, {
+      method: "POST",
+      headers: getHeaders(false),
+    });
+    return handleResponse<User>(res);
+  },
+
+  // ==========================================
+  // NOTIFICATIONS
+  // ==========================================
+  async getNotifications(params?: { unreadOnly?: boolean; type?: string }): Promise<{ notifications: Notification[]; unreadCount: number; total: number }> {
+    const query = new URLSearchParams();
+    if (params?.unreadOnly) query.append("unreadOnly", "true");
+    if (params?.type && params.type !== "all") query.append("type", params.type);
+
+    const res = await fetch(`/api/notifications?${query.toString()}`, {
+      headers: getHeaders(false),
+    });
+    return handleResponse<{ notifications: Notification[]; unreadCount: number; total: number }>(res);
+  },
+
+  async markNotificationAsRead(id: string): Promise<{ notification: Notification; unreadCount: number }> {
+    const res = await fetch(`/api/notifications/${id}/read`, {
+      method: "PUT",
+      headers: getHeaders(false),
+    });
+    return handleResponse<{ notification: Notification; unreadCount: number }>(res);
+  },
+
+  async markAllNotificationsAsRead(): Promise<{ unreadCount: number }> {
+    const res = await fetch("/api/notifications/read-all", {
+      method: "PUT",
+      headers: getHeaders(false),
+    });
+    return handleResponse<{ unreadCount: number }>(res);
+  },
+
+  async deleteNotification(id: string): Promise<{ unreadCount: number }> {
+    const res = await fetch(`/api/notifications/${id}`, {
+      method: "DELETE",
+      headers: getHeaders(false),
+    });
+    return handleResponse<{ unreadCount: number }>(res);
+  },
+
+  async clearAllNotifications(): Promise<{ unreadCount: number }> {
+    const res = await fetch("/api/notifications", {
+      method: "DELETE",
+      headers: getHeaders(false),
+    });
+    return handleResponse<{ unreadCount: number }>(res);
   },
 };

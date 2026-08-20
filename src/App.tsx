@@ -7,15 +7,16 @@ import { CreatePostBox } from "./components/CreatePostBox";
 import { PostCard } from "./components/PostCard";
 import { ProfileView } from "./components/ProfileView";
 import { AuthModal } from "./components/AuthModal";
-import { ArchitectureDocsModal } from "./components/ArchitectureDocsModal";
 import { ImageLightboxModal } from "./components/ImageLightboxModal";
+import { ChatView } from "./components/ChatView";
+import { NotificationsView } from "./components/NotificationsView";
 import { Toast, ToastMessage } from "./components/Toast";
 import { api } from "./services/api";
 import { Post } from "./types";
-import { Sparkles, RefreshCw, X, Search, Compass, AlertCircle } from "lucide-react";
+import { RefreshCw, X, Search, Compass, AlertCircle, MessageSquare, Bell } from "lucide-react";
 
 function MainApp() {
-  const { user, isAuthenticated, openAuthModal } = useAuth();
+  const { isAuthenticated, openAuthModal } = useAuth();
   
   // Navigation & View State
   const [currentTab, setCurrentTab] = useState<NavTab>("for-you");
@@ -27,8 +28,15 @@ function MainApp() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
 
   // Modals & Lightbox
-  const [showDocsModal, setShowDocsModal] = useState(false);
-  const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
+  const [lightboxState, setLightboxState] = useState<{
+    imageUrl: string | null;
+    images?: string[];
+    initialIndex?: number;
+  }>({ imageUrl: null });
+
+  const handleOpenLightbox = (imageUrl: string, images?: string[], initialIndex?: number) => {
+    setLightboxState({ imageUrl, images, initialIndex });
+  };
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -68,16 +76,12 @@ function MainApp() {
   }, [currentTab, searchQuery]);
 
   useEffect(() => {
-    if (currentTab !== "profile" && currentTab !== "docs") {
+    if (currentTab !== "profile" && currentTab !== "chat" && currentTab !== "notifications") {
       fetchPosts();
     }
   }, [fetchPosts, currentTab]);
 
   const handleSelectTab = (tab: NavTab) => {
-    if (tab === "docs") {
-      setShowDocsModal(true);
-      return;
-    }
     setCurrentTab(tab);
     setSelectedUserId(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -103,7 +107,7 @@ function MainApp() {
 
   const handleFilterHashtag = (tag: string) => {
     setSearchQuery(tag);
-    if (currentTab === "profile") {
+    if (currentTab === "profile" || currentTab === "notifications" || currentTab === "chat") {
       setCurrentTab("for-you");
       setSelectedUserId(null);
     }
@@ -118,15 +122,20 @@ function MainApp() {
             openAuthModal("login");
             return;
           }
-          window.scrollTo({ top: 0, behavior: "smooth" });
-          const textarea = document.getElementById("create-post-textarea");
-          if (textarea) textarea.focus();
+          if (currentTab !== "for-you") {
+            setCurrentTab("for-you");
+            setSelectedUserId(null);
+          }
+          setTimeout(() => {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            const textarea = document.getElementById("create-post-textarea");
+            if (textarea) textarea.focus();
+          }, 50);
         }}
-        onOpenArchitectureDocs={() => setShowDocsModal(true)}
         onSelectUser={handleSelectUser}
         onSearch={(q) => {
           setSearchQuery(q);
-          if (currentTab === "profile" && q.trim()) {
+          if ((currentTab === "profile" || currentTab === "notifications" || currentTab === "chat") && q.trim()) {
             setCurrentTab("for-you");
             setSelectedUserId(null);
           }
@@ -137,6 +146,7 @@ function MainApp() {
           setSelectedUserId(null);
           setSearchQuery("");
         }}
+        onShowToast={showToast}
       />
 
       {/* Main Container Layout */}
@@ -153,19 +163,25 @@ function MainApp() {
                   openAuthModal("login");
                   return;
                 }
-                window.scrollTo({ top: 0, behavior: "smooth" });
-                const textarea = document.getElementById("create-post-textarea");
-                if (textarea) textarea.focus();
+                if (currentTab !== "for-you") {
+                  setCurrentTab("for-you");
+                  setSelectedUserId(null);
+                }
+                setTimeout(() => {
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                  const textarea = document.getElementById("create-post-textarea");
+                  if (textarea) textarea.focus();
+                }, 50);
               }}
               onSelectUser={handleSelectUser}
             />
           </div>
 
-          {/* CENTER FEED / VIEW (Col 4-8 on desktop, col 1 on mobile) */}
-          <div className="col-span-1 md:col-span-9 lg:col-span-6 flex flex-col gap-4">
+          {/* CENTER FEED / VIEW (Col 4-8 on desktop, col 1 on mobile, Col 4-12 in Chat mode) */}
+          <div className={`col-span-1 ${currentTab === "chat" ? "md:col-span-9 lg:col-span-9" : "md:col-span-9 lg:col-span-6"} flex flex-col gap-4`}>
             
             {/* Active Search Filter Banner */}
-            {searchQuery && (
+            {searchQuery && currentTab !== "chat" && (
               <div className="flex items-center justify-between p-3.5 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 rounded-2xl">
                 <div className="flex items-center gap-2 text-xs font-semibold text-indigo-900 dark:text-indigo-200">
                   <Search className="w-4 h-4 text-indigo-600" />
@@ -183,13 +199,24 @@ function MainApp() {
               </div>
             )}
 
-            {/* Profile View Mode */}
-            {currentTab === "profile" && selectedUserId ? (
+            {/* View Mode Switching */}
+            {currentTab === "chat" ? (
+              <ChatView
+                onSelectUser={handleSelectUser}
+                onShowImageModal={handleOpenLightbox}
+                onShowToast={showToast}
+              />
+            ) : currentTab === "notifications" ? (
+              <NotificationsView
+                onSelectUser={handleSelectUser}
+                onShowToast={showToast}
+              />
+            ) : currentTab === "profile" && selectedUserId ? (
               <ProfileView
                 userId={selectedUserId}
                 onSelectUser={handleSelectUser}
                 onFilterHashtag={handleFilterHashtag}
-                onShowImageModal={setLightboxImageUrl}
+                onShowImageModal={handleOpenLightbox}
                 onShowToast={showToast}
               />
             ) : (
@@ -200,63 +227,6 @@ function MainApp() {
                   onPostCreated={handlePostCreated}
                   onShowToast={showToast}
                 />
-
-                {/* Feed Filter Tabs */}
-                <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-xs">
-                  <div className="flex items-center gap-1">
-                    <button
-                      id="feed-tab-for-you"
-                      onClick={() => handleSelectTab("for-you")}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                        currentTab === "for-you"
-                          ? "bg-indigo-600 text-white shadow-xs"
-                          : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
-                      }`}
-                    >
-                      Dành cho bạn
-                    </button>
-
-                    <button
-                      id="feed-tab-following"
-                      onClick={() => {
-                        if (!isAuthenticated) {
-                          openAuthModal("login");
-                          return;
-                        }
-                        handleSelectTab("following");
-                      }}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                        currentTab === "following"
-                          ? "bg-indigo-600 text-white shadow-xs"
-                          : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
-                      }`}
-                    >
-                      Đang theo dõi
-                    </button>
-
-                    <button
-                      id="feed-tab-explore"
-                      onClick={() => handleSelectTab("explore")}
-                      className={`hidden sm:flex items-center gap-1 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                        currentTab === "explore"
-                          ? "bg-indigo-600 text-white shadow-xs"
-                          : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
-                      }`}
-                    >
-                      <Compass className="w-3.5 h-3.5" />
-                      <span>Khám phá</span>
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={fetchPosts}
-                    disabled={isLoadingPosts}
-                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors"
-                    title="Làm mới bảng tin"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${isLoadingPosts ? "animate-spin text-indigo-600" : ""}`} />
-                  </button>
-                </div>
 
                 {/* Posts List Feed */}
                 {isLoadingPosts ? (
@@ -290,8 +260,9 @@ function MainApp() {
                         onPostDeleted={handlePostDeleted}
                         onSelectUser={handleSelectUser}
                         onFilterHashtag={handleFilterHashtag}
-                        onShowImageModal={setLightboxImageUrl}
+                        onShowImageModal={handleOpenLightbox}
                         onShowToast={showToast}
+                        onPostCreated={handlePostCreated}
                       />
                     ))}
                   </div>
@@ -300,32 +271,29 @@ function MainApp() {
             )}
           </div>
 
-          {/* RIGHT SIDEBAR (Col 9-12 on desktop) */}
-          <div className="hidden lg:block lg:col-span-3 sticky top-20">
-            <SidebarRight
-              onSelectUser={handleSelectUser}
-              onFilterHashtag={handleFilterHashtag}
-              onShowDocs={() => setShowDocsModal(true)}
-            />
-          </div>
+          {/* RIGHT SIDEBAR (Col 9-12 on desktop, hidden in Chat mode for maximum space) */}
+          {currentTab !== "chat" && (
+            <div className="hidden lg:block lg:col-span-3 sticky top-20">
+              <SidebarRight
+                onSelectUser={handleSelectUser}
+                onFilterHashtag={handleFilterHashtag}
+              />
+            </div>
+          )}
 
         </div>
       </main>
 
-      {/* Lightbox Modal */}
+      {/* Multi-Image Gallery Lightbox Modal */}
       <ImageLightboxModal
-        imageUrl={lightboxImageUrl}
-        onClose={() => setLightboxImageUrl(null)}
+        imageUrl={lightboxState.imageUrl}
+        images={lightboxState.images}
+        initialIndex={lightboxState.initialIndex}
+        onClose={() => setLightboxState({ imageUrl: null })}
       />
 
       {/* Auth Modal (Login / Register) */}
       <AuthModal onShowToast={showToast} />
-
-      {/* Architecture & DB Documentation Modal */}
-      <ArchitectureDocsModal
-        isOpen={showDocsModal}
-        onClose={() => setShowDocsModal(false)}
-      />
 
       {/* Global Toast Alert Notifications */}
       <Toast toasts={toasts} onDismiss={dismissToast} />
@@ -340,3 +308,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+

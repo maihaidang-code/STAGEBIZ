@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Lock, Mail, User as UserIcon, Eye, EyeOff, Sparkles, LogIn, UserPlus } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../services/api";
@@ -91,12 +92,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onShowToast }) => {
     }
   };
 
-  return (
-    <div id="auth-modal-backdrop" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs" onClick={closeAuthModal}>
-      <div
-        className="bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
-        onClick={(e) => e.stopPropagation()}
-      >
+  return createPortal(
+    <div id="auth-modal-portal" className="fixed inset-0 z-[9999] overflow-y-auto">
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity" 
+        onClick={closeAuthModal}
+        aria-hidden="true" 
+      />
+
+      {/* Centering container */}
+      <div className="flex min-h-full items-center justify-center p-3 sm:p-4 text-center">
+        <div
+          className="relative transform overflow-hidden rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 text-left shadow-2xl border border-slate-200 dark:border-slate-800 transition-all w-full max-w-md my-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3.5rem)] animate-in fade-in zoom-in-95 duration-150"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-3">
           <div className="flex items-center gap-2">
@@ -351,5 +361,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onShowToast }) => {
         </div>
       </div>
     </div>
-  );
+  </div>,
+  document.body
+);
 };

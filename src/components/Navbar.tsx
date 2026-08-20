@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect } from "react";
 import { 
   Search, 
   PlusCircle, 
-  Database, 
   LogOut, 
   User as UserIcon, 
+  Settings,
   Sparkles, 
   Users, 
   LogIn, 
@@ -15,27 +15,29 @@ import { useAuth } from "../context/AuthContext";
 import { api } from "../services/api";
 import { User } from "../types";
 import { VerifiedBadge } from "./VerifiedBadge";
+import { SettingsModal } from "./SettingsModal";
 
 interface NavbarProps {
   onOpenCreatePost: () => void;
-  onOpenArchitectureDocs: () => void;
   onSelectUser: (userId: string) => void;
   onSearch: (query: string) => void;
   searchQuery: string;
   onNavigateHome: () => void;
+  onShowToast?: (text: string, type: "success" | "error" | "info") => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenCreatePost,
-  onOpenArchitectureDocs,
   onSelectUser,
   onSearch,
   searchQuery,
   onNavigateHome,
+  onShowToast,
 }) => {
   const { user, isAuthenticated, logout, openAuthModal, switchDemoAccount } = useAuth();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isDemoMenuOpen, setIsDemoMenuOpen] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [demoUsers, setDemoUsers] = useState<(User & { defaultPassword: string })[]>([]);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const demoMenuRef = useRef<HTMLDivElement>(null);
@@ -93,17 +95,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Actions & User Section */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Architecture & DB Docs Button */}
-          <button
-            id="btn-nav-architecture-docs"
-            onClick={onOpenArchitectureDocs}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 transition-colors"
-            title="Xem thiết kế Database & Tài liệu API"
-          >
-            <Database className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <span className="hidden md:inline">Tài liệu API & DB</span>
-          </button>
-
           {/* Quick Demo Switcher */}
           <div className="relative" ref={demoMenuRef}>
             <button
@@ -204,6 +195,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
 
                     <button
+                      id="menu-item-profile"
                       onClick={() => {
                         onSelectUser(user.id);
                         setIsUserMenuOpen(false);
@@ -215,6 +207,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
 
                     <button
+                      id="menu-item-settings"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        setShowSettingsModal(true);
+                      }}
+                      className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2.5"
+                    >
+                      <Settings className="w-4 h-4 text-slate-500" />
+                      <span>Cài đặt & Bảo mật</span>
+                    </button>
+
+                    <div className="my-1 border-t border-slate-100 dark:border-slate-700/60" />
+
+                    <button
+                      id="menu-item-logout"
                       onClick={() => {
                         logout();
                         setIsUserMenuOpen(false);
@@ -250,6 +257,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
       </div>
+
+      {/* Settings Modal (Change Password & Delete Account) */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        onShowToast={onShowToast || (() => {})}
+      />
     </header>
   );
 };

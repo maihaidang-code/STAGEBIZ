@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { UserPlus, UserCheck, TrendingUp, Sparkles, Hash, Code2 } from "lucide-react";
+import { UserPlus, UserCheck, TrendingUp, Sparkles, Hash, ShieldCheck } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../services/api";
 import { User } from "../types";
@@ -8,13 +8,11 @@ import { VerifiedBadge } from "./VerifiedBadge";
 interface SidebarRightProps {
   onSelectUser: (userId: string) => void;
   onFilterHashtag: (tag: string) => void;
-  onShowDocs: () => void;
 }
 
 export const SidebarRight: React.FC<SidebarRightProps> = ({
   onSelectUser,
   onFilterHashtag,
-  onShowDocs,
 }) => {
   const { user, isAuthenticated, openAuthModal } = useAuth();
   const [suggestedUsers, setSuggestedUsers] = useState<(User & { followersCount: number; isFollowing: boolean })[]>([]);
@@ -156,21 +154,15 @@ export const SidebarRight: React.FC<SidebarRightProps> = ({
         </div>
       </div>
 
-      {/* Architecture Tech Stack Badge */}
-      <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-4 text-white shadow-sm">
-        <div className="flex items-center gap-2 mb-2">
-          <Code2 className="w-4 h-4 text-indigo-400" />
-          <span className="text-xs font-bold tracking-wide uppercase text-indigo-300">Công nghệ xây dựng</span>
+      {/* Community Verification & Trust Badge */}
+      <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex items-center gap-2 mb-1.5 text-slate-800 dark:text-slate-200 font-bold">
+          <ShieldCheck className="w-4 h-4 text-sky-500" />
+          <span>Cộng đồng Xác minh Chính chủ</span>
         </div>
-        <p className="text-xs text-slate-300 mb-3 leading-relaxed">
-          Được xây dựng với Node.js + Express, mã hóa bcrypt, JWT auth & React 19.
+        <p className="leading-relaxed">
+          Tài khoản có thể nộp hồ sơ xin cấp Tick Xanh qua trang cá nhân để được Quản trị viên xét duyệt.
         </p>
-        <button
-          onClick={onShowDocs}
-          className="w-full py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white backdrop-blur-sm border border-white/10 transition-colors text-center"
-        >
-          Khám phá Database & Code API →
-        </button>
       </div>
     </div>
   );

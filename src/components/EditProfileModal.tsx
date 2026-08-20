@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X, Upload, Check, Sparkles, Image as ImageIcon, BadgeCheck } from "lucide-react";
 import { User } from "../types";
 import { api } from "../services/api";
@@ -96,14 +97,23 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     }
   };
 
-  return (
-    <div id="edit-profile-modal-backdrop" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" onClick={onClose}>
-      <div
-        className="bg-white dark:bg-slate-800 w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-150"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+  return createPortal(
+    <div id="edit-profile-modal-portal" className="fixed inset-0 z-[9999] overflow-y-auto">
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity" 
+        onClick={onClose}
+        aria-hidden="true" 
+      />
+
+      {/* Centering container */}
+      <div className="flex min-h-full items-center justify-center p-3 sm:p-4 text-center">
+        <div
+          className="relative transform overflow-hidden rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-800 text-left shadow-2xl border border-slate-200 dark:border-slate-700 transition-all w-full max-w-xl my-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3.5rem)] animate-in fade-in zoom-in-95 duration-150"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Modal Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
           <h3 className="text-base font-bold text-slate-900 dark:text-white">Chỉnh sửa trang cá nhân</h3>
           <button
             onClick={onClose}
@@ -319,5 +329,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         </form>
       </div>
     </div>
-  );
+  </div>,
+  document.body
+);
 };

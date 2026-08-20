@@ -145,9 +145,11 @@ export const ReactionSummaryBadge: React.FC<ReactionSummaryBadgeProps> = ({
   if (activeTypes.length === 0) return null;
 
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 cursor-pointer select-none text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors ${
+      title="Xem danh sách người đã bày tỏ cảm xúc"
+      className={`group inline-flex items-center gap-1.5 cursor-pointer select-none text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-all rounded-md px-1 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-750 ${
         size === "sm" ? "text-xs" : "text-sm"
       }`}
     >
@@ -155,14 +157,14 @@ export const ReactionSummaryBadge: React.FC<ReactionSummaryBadgeProps> = ({
         {activeTypes.slice(0, 3).map((type) => (
           <span
             key={type}
-            className="inline-flex items-center justify-center w-4 h-4 text-[11px] rounded-full ring-1 ring-white dark:ring-slate-800 bg-slate-100 dark:bg-slate-700 shadow-2xs"
+            className="inline-flex items-center justify-center w-4 h-4 text-[11px] rounded-full ring-1 ring-white dark:ring-slate-800 bg-slate-100 dark:bg-slate-700 shadow-2xs group-hover:scale-110 transition-transform"
           >
             {REACTIONS_DATA[type].emoji}
           </span>
         ))}
       </div>
-      <span className="font-semibold text-slate-600 dark:text-slate-300">{total}</span>
-    </div>
+      <span className="font-semibold text-slate-600 dark:text-slate-300 group-hover:underline">{total}</span>
+    </button>
   );
 };
 
