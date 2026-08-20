@@ -1,0 +1,6 @@
+{
+  "name": "StageBiz - Mini Social Network",
+  "description": "Mạng xã hội StageBiz với xác thực JWT, trang cá nhân, đăng bài, bày tỏ 6 loại cảm xúc, trả lời bình luận theo luồng (threaded replies) và tài khoản xác minh tick xanh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
