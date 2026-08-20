@@ -1,4 +1,4 @@
-import { AuthResponse, Post, User, Comment, ReactionType, ReactionSummary } from "../types";
+import { AuthResponse, Post, User, Comment, ReactionType, ReactionSummary, VerificationRequest } from "../types";
 
 const TOKEN_KEY = "mini_social_jwt_token";
 
@@ -85,14 +85,6 @@ export const api = {
     return handleResponse<User>(res);
   },
 
-  async toggleUserVerification(userId: string): Promise<{ isVerified: boolean; user: User }> {
-    const res = await fetch(`/api/users/${userId}/verify-toggle`, {
-      method: "POST",
-      headers: getHeaders(false),
-    });
-    return handleResponse<{ isVerified: boolean; user: User }>(res);
-  },
-
   async toggleFollow(userId: string): Promise<{ isFollowing: boolean; targetFollowersCount: number; currentFollowingCount: number }> {
     const res = await fetch(`/api/users/${userId}/follow`, {
       method: "POST",
@@ -127,6 +119,48 @@ export const api = {
       headers: getHeaders(false),
     });
     return handleResponse<User[]>(res);
+  },
+
+  // Verification Requests
+  async submitVerificationRequest(): Promise<VerificationRequest> {
+    const res = await fetch("/api/verification-requests", {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({}),
+    });
+    return handleResponse<VerificationRequest>(res);
+  },
+
+  async getVerificationRequests(): Promise<VerificationRequest[]> {
+    const res = await fetch("/api/verification-requests", {
+      headers: getHeaders(false),
+    });
+    return handleResponse<VerificationRequest[]>(res);
+  },
+
+  async getUserVerificationRequest(): Promise<VerificationRequest | null> {
+    const res = await fetch("/api/verification-requests/my", {
+      headers: getHeaders(false),
+    });
+    return handleResponse<VerificationRequest | null>(res);
+  },
+
+  async approveVerificationRequest(requestId: string): Promise<{ isVerified: boolean; user: User }> {
+    const res = await fetch(`/api/verification-requests/${requestId}/approve`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({}),
+    });
+    return handleResponse<{ isVerified: boolean; user: User }>(res);
+  },
+
+  async rejectVerificationRequest(requestId: string, reason?: string): Promise<{ user: User }> {
+    const res = await fetch(`/api/verification-requests/${requestId}/reject`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ reason }),
+    });
+    return handleResponse<{ user: User }>(res);
   },
 
   // Posts

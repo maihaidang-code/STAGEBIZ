@@ -97,6 +97,16 @@ export interface Comment {
   createdAt: string;
 }
 
+export interface VerificationRequest {
+  id: string;
+  userId: string;
+  user: User;
+  status: "pending" | "approved" | "rejected";
+  reason?: string;
+  createdAt: string;
+  approvedAt?: string;
+}
+
 export interface AuthResponse {
   token: string;
   user: User;
