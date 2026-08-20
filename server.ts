@@ -31,6 +31,8 @@ interface StoredUser {
   followers: string[];
   following: string[];
   createdAt: string;
+  deletionRequestedAt?: string;
+  markedForDeletion?: boolean;
 }
 
 interface StoredPost {
@@ -387,6 +389,37 @@ class Database {
 
 const db = new Database();
 
+const ACCOUNT_DELETION_GRACE_PERIOD_MS = 3 * 24 * 3600 * 1000; // 3 days
+const ACCOUNT_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // run every hour
+
+// Permanently removes accounts that have been marked for deletion for
+// longer than the grace period (3 days).
+function cleanupDeletedAccounts() {
+  const now = Date.now();
+  const usersToDelete = db.users.filter((u) => {
+    if (!u.markedForDeletion || !u.deletionRequestedAt) return false;
+    return now - new Date(u.deletionRequestedAt).getTime() > ACCOUNT_DELETION_GRACE_PERIOD_MS;
+  });
+
+  if (usersToDelete.length === 0) return;
+
+  const deletedIds = new Set(usersToDelete.map((u) => u.id));
+
+  db.users = db.users.filter((u) => !deletedIds.has(u.id));
+
+  // Clean up related data & references to the deleted users
+  db.posts = db.posts.filter((p) => !deletedIds.has(p.authorId));
+  db.comments = db.comments.filter((c) => !deletedIds.has(c.authorId));
+  db.users.forEach((u) => {
+    u.followers = u.followers.filter((id) => !deletedIds.has(id));
+    u.following = u.following.filter((id) => !deletedIds.has(id));
+  });
+
+  usersToDelete.forEach((u) => {
+    console.log(`🧹 Đã xóa vĩnh viễn tài khoản ${u.username} (${u.id}) sau thời gian ân hạn 3 ngày.`);
+  });
+}
+
 // Auth Middleware
 interface AuthRequest extends Request {
   userId?: string;
@@ -538,6 +571,15 @@ async function startServer() {
         return;
       }
 
+      // If the account was marked for deletion, logging in again cancels the request
+      let deletionCancelled = false;
+      if (user.markedForDeletion) {
+        user.markedForDeletion = false;
+        user.deletionRequestedAt = undefined;
+        deletionCancelled = true;
+        console.log(`♻️  Yêu cầu xóa tài khoản của ${user.username} (${user.id}) đã được hủy do đăng nhập lại.`);
+      }
+
       // Create JWT Token
       const token = jwt.sign(
         { userId: user.id, email: user.email, username: user.username },
@@ -547,7 +589,10 @@ async function startServer() {
 
       res.json({
         success: true,
-        message: "Đăng nhập thành công!",
+        message: deletionCancelled
+          ? "Đăng nhập thành công! Yêu cầu xóa tài khoản của bạn đã được hủy."
+          : "Đăng nhập thành công!",
+        deletionCancelled,
         data: {
           token,
           user: db.sanitizeUser(user),
@@ -581,9 +626,70 @@ async function startServer() {
     res.json({ success: true, data: sanitized });
   });
 
+  // 5. Change Password
+  app.post("/api/auth/change-password", authenticateToken, (req: AuthRequest, res: Response): void => {
+    try {
+      const { oldPassword, newPassword } = req.body;
+
+      if (!oldPassword || !newPassword) {
+        res.status(400).json({ success: false, error: "Vui lòng nhập mật khẩu cũ và mật khẩu mới" });
+        return;
+      }
+
+      if (String(newPassword).length < 6) {
+        res.status(400).json({ success: false, error: "Mật khẩu mới phải có ít nhất 6 ký tự" });
+        return;
+      }
+
+      const user = db.findUserById(req.userId!);
+      if (!user) {
+        res.status(404).json({ success: false, error: "Không tìm thấy người dùng" });
+        return;
+      }
+
+      const isOldPasswordValid = bcrypt.compareSync(oldPassword, user.passwordHash);
+      if (!isOldPasswordValid) {
+        res.status(401).json({ success: false, error: "Mật khẩu cũ không chính xác" });
+        return;
+      }
+
+      const salt = bcrypt.genSaltSync(10);
+      user.passwordHash = bcrypt.hashSync(newPassword, salt);
+
+      res.json({ success: true, message: "Đổi mật khẩu thành công!" });
+    } catch (error) {
+      console.error("Change Password Error:", error);
+      res.status(500).json({ success: false, error: "Đã xảy ra lỗi máy chủ trong quá trình đổi mật khẩu" });
+    }
+  });
+
   // ==========================================
   // USER PROFILE & SOCIAL GRAPH ROUTES
   // ==========================================
+
+  // Request Account Deletion (soft delete with 3-day grace period)
+  app.post("/api/users/delete-request", authenticateToken, (req: AuthRequest, res: Response): void => {
+    try {
+      const user = db.findUserById(req.userId!);
+      if (!user) {
+        res.status(404).json({ success: false, error: "Không tìm thấy người dùng" });
+        return;
+      }
+
+      user.markedForDeletion = true;
+      user.deletionRequestedAt = new Date().toISOString();
+
+      console.log(`🗑️  Tài khoản ${user.username} (${user.id}) đã yêu cầu xóa lúc ${user.deletionRequestedAt}`);
+
+      res.json({
+        success: true,
+        message: "Tài khoản của bạn sẽ bị xóa trong 3 ngày. Đăng nhập lại để hủy yêu cầu.",
+      });
+    } catch (error) {
+      console.error("Delete Request Error:", error);
+      res.status(500).json({ success: false, error: "Đã xảy ra lỗi máy chủ trong quá trình yêu cầu xóa tài khoản" });
+    }
+  });
 
   // Get User Profile by ID or Username
   app.get("/api/users/:id", optionalAuthenticate, (req: AuthRequest, res: Response): void => {
@@ -1231,6 +1337,10 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // Run account cleanup on startup, then periodically every hour
+  cleanupDeletedAccounts();
+  setInterval(cleanupDeletedAccounts, ACCOUNT_CLEANUP_INTERVAL_MS);
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 StageBiz Social Network server running on http://localhost:${PORT}`);
