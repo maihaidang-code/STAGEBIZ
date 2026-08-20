@@ -21,8 +21,8 @@ export interface User {
   location?: string;
   website?: string;
   isVerified?: boolean;
-  followers: string[]; // array of user IDs
-  following: string[]; // array of user IDs
+  followers: string[];
+  following: string[];
   createdAt: string;
 }
 
@@ -55,7 +55,7 @@ export interface Post {
   };
   content: string;
   image?: string;
-  likes: string[]; // array of user IDs
+  likes: string[];
   reactions?: PostReaction[];
   userReaction?: ReactionType | null;
   reactionsSummary?: ReactionSummary;
@@ -107,4 +107,35 @@ export interface ApiResponse<T = unknown> {
   message?: string;
   data?: T;
   error?: string;
+}
+
+// Notification Types
+export type NotificationType = 'like' | 'love' | 'comment' | 'reply' | 'follow' | 'mention' | 'share';
+
+export interface NotificationSenderInfo {
+  id: string;
+  name: string;
+  username: string;
+  avatar: string;
+  isVerified: boolean;
+}
+
+export interface NotificationRelatedContent {
+  postContent?: string;
+  commentContent?: string;
+}
+
+export interface Notification {
+  id: string;
+  recipientId: string;
+  senderId: string;
+  type: NotificationType;
+  postId?: string;
+  commentId?: string;
+  content: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  senderInfo: NotificationSenderInfo;
+  relatedContent?: NotificationRelatedContent;
 }
